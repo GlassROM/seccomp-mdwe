@@ -13,10 +13,9 @@
 #define GL_SC_ACTION SCMP_ACT_KILL
 #endif
 
-void setup_seccomp() {
-  scmp_filter_ctx ctx;
+static inline void setup_seccomp() {
+  scmp_filter_ctx ctx = seccomp_init(SCMP_ACT_ALLOW);
 
-  ctx = seccomp_init(SCMP_ACT_ALLOW);
   if (!ctx) {
     perror("seccomp not supported");
     exit(EXIT_FAILURE);
