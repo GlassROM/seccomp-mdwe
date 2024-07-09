@@ -13,7 +13,7 @@
 #define GL_SC_ACTION SCMP_ACT_KILL
 #endif
 
-static inline void setup_seccomp() {
+static inline void setup_seccomp(void) {
   scmp_filter_ctx ctx = seccomp_init(SCMP_ACT_ALLOW);
 
   if (!ctx) {
