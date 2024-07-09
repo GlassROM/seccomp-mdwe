@@ -36,6 +36,15 @@ static inline void setup_seccomp(void) {
     exit(EXIT_FAILURE);
   }
 
+  if (seccomp_rule_add(
+          ctx, GL_SC_ACTION, SCMP_SYS(mmap), 2,
+          SCMP_CMP(2, SCMP_CMP_MASKED_EQ, PROT_EXEC, PROT_EXEC),
+          SCMP_CMP(3, SCMP_CMP_MASKED_EQ, MAP_ANONYMOUS, MAP_ANONYMOUS)) < 0) {
+    perror("mmap anon could not be protected, failing safely!");
+    seccomp_release(ctx);
+    exit(EXIT_FAILURE);
+  }
+
   if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(pkey_mprotect), 1,
                        SCMP_A2(SCMP_CMP_MASKED_EQ, PROT_EXEC, PROT_EXEC)) < 0) {
     perror("pkey_mprotect could not be protected, failing safely!");
