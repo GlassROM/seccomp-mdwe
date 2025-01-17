@@ -59,6 +59,12 @@ static inline void setup_seccomp(void) {
     exit(EXIT_FAILURE);
   }
 
+  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(memfd_create), 0) < 0) {
+    perror("memfd_create could not be protected, failing safely!");
+    seccomp_release(ctx);
+    exit(EXIT_FAILURE);
+  }
+
   if (seccomp_load(ctx) < 0) {
     perror("failed to load seccomp filter");
     seccomp_release(ctx);
