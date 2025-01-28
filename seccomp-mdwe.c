@@ -21,6 +21,12 @@ static inline void setup_seccomp(void) {
     exit(EXIT_FAILURE);
   }
 
+  if (seccomp_attr_set(ctx, SCMP_FLTATR_CTL_TSYNC, 1) < 0) {
+    perror("failed to set up seccomp in TSYNC mode, failing safely!");
+    seccomp_release(ctx);
+    exit(EXIT_FAILURE);
+  }
+
   if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(mprotect), 1,
                        SCMP_A2(SCMP_CMP_MASKED_EQ, PROT_EXEC, PROT_EXEC)) < 0) {
     perror("mprotect could not be protected, failing safely!");
