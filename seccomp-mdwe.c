@@ -1,10 +1,12 @@
 #include <errno.h>
+#include <linux/fcntl.h>
 #include <seccomp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <sys/prctl.h>
 #include <sys/shm.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #ifdef GL_PERMISSIVE
@@ -73,6 +75,110 @@ static inline void setup_seccomp(void) {
 
   if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(ptrace), 0) < 0) {
     perror("ptrace could not be protected, failing safely!");
+    seccomp_release(ctx);
+    exit(EXIT_FAILURE);
+  }
+
+  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(chmod), 1,
+                       SCMP_A1(SCMP_CMP_MASKED_EQ, S_IXUSR, S_IXUSR)) < 0) {
+    perror("chmod user-execute could not be protected, failing safely!");
+    seccomp_release(ctx);
+    exit(EXIT_FAILURE);
+  }
+  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(chmod), 1,
+                       SCMP_A1(SCMP_CMP_MASKED_EQ, S_IXGRP, S_IXGRP)) < 0) {
+    perror("chmod group-execute could not be protected, failing safely!");
+    seccomp_release(ctx);
+    exit(EXIT_FAILURE);
+  }
+  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(chmod), 1,
+                       SCMP_A1(SCMP_CMP_MASKED_EQ, S_IXOTH, S_IXOTH)) < 0) {
+    perror("chmod other-execute could not be protected, failing safely!");
+    seccomp_release(ctx);
+    exit(EXIT_FAILURE);
+  }
+
+  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(fchmod), 1,
+                       SCMP_A1(SCMP_CMP_MASKED_EQ, S_IXUSR, S_IXUSR)) < 0) {
+    perror("fchmod user-execute could not be protected, failing safely!");
+    seccomp_release(ctx);
+    exit(EXIT_FAILURE);
+  }
+  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(fchmod), 1,
+                       SCMP_A1(SCMP_CMP_MASKED_EQ, S_IXGRP, S_IXGRP)) < 0) {
+    perror("fchmod group-execute could not be protected, failing safely!");
+    seccomp_release(ctx);
+    exit(EXIT_FAILURE);
+  }
+  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(fchmod), 1,
+                       SCMP_A1(SCMP_CMP_MASKED_EQ, S_IXOTH, S_IXOTH)) < 0) {
+    perror("fchmod other-execute could not be protected, failing safely!");
+    seccomp_release(ctx);
+    exit(EXIT_FAILURE);
+  }
+
+  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(fchmodat), 1,
+                       SCMP_A2(SCMP_CMP_MASKED_EQ, S_IXUSR, S_IXUSR)) < 0) {
+    perror("fchmodat user-execute could not be protected, failing safely!");
+    seccomp_release(ctx);
+    exit(EXIT_FAILURE);
+  }
+  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(fchmodat), 1,
+                       SCMP_A2(SCMP_CMP_MASKED_EQ, S_IXGRP, S_IXGRP)) < 0) {
+    perror("fchmodat group-execute could not be protected, failing safely!");
+    seccomp_release(ctx);
+    exit(EXIT_FAILURE);
+  }
+  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(fchmodat), 1,
+                       SCMP_A2(SCMP_CMP_MASKED_EQ, S_IXOTH, S_IXOTH)) < 0) {
+    perror("fchmodat other-execute could not be protected, failing safely!");
+    seccomp_release(ctx);
+    exit(EXIT_FAILURE);
+  }
+
+  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(open), 2,
+                       SCMP_CMP(1, SCMP_CMP_MASKED_EQ, O_CREAT, O_CREAT),
+                       SCMP_A2(SCMP_CMP_MASKED_EQ, S_IXUSR, S_IXUSR)) < 0) {
+    perror("open (O_CREAT + S_IXUSR) could not be protected, failing safely!");
+    seccomp_release(ctx);
+    exit(EXIT_FAILURE);
+  }
+  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(open), 2,
+                       SCMP_CMP(1, SCMP_CMP_MASKED_EQ, O_CREAT, O_CREAT),
+                       SCMP_A2(SCMP_CMP_MASKED_EQ, S_IXGRP, S_IXGRP)) < 0) {
+    perror("open (O_CREAT + S_IXGRP) could not be protected, failing safely!");
+    seccomp_release(ctx);
+    exit(EXIT_FAILURE);
+  }
+  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(open), 2,
+                       SCMP_CMP(1, SCMP_CMP_MASKED_EQ, O_CREAT, O_CREAT),
+                       SCMP_A2(SCMP_CMP_MASKED_EQ, S_IXOTH, S_IXOTH)) < 0) {
+    perror("open (O_CREAT + S_IXOTH) could not be protected, failing safely!");
+    seccomp_release(ctx);
+    exit(EXIT_FAILURE);
+  }
+
+  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(openat), 2,
+                       SCMP_CMP(2, SCMP_CMP_MASKED_EQ, O_CREAT, O_CREAT),
+                       SCMP_A3(SCMP_CMP_MASKED_EQ, S_IXUSR, S_IXUSR)) < 0) {
+    perror(
+        "openat (O_CREAT + S_IXUSR) could not be protected, failing safely!");
+    seccomp_release(ctx);
+    exit(EXIT_FAILURE);
+  }
+  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(openat), 2,
+                       SCMP_CMP(2, SCMP_CMP_MASKED_EQ, O_CREAT, O_CREAT),
+                       SCMP_A3(SCMP_CMP_MASKED_EQ, S_IXGRP, S_IXGRP)) < 0) {
+    perror(
+        "openat (O_CREAT + S_IXGRP) could not be protected, failing safely!");
+    seccomp_release(ctx);
+    exit(EXIT_FAILURE);
+  }
+  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(openat), 2,
+                       SCMP_CMP(2, SCMP_CMP_MASKED_EQ, O_CREAT, O_CREAT),
+                       SCMP_A3(SCMP_CMP_MASKED_EQ, S_IXOTH, S_IXOTH)) < 0) {
+    perror(
+        "openat (O_CREAT + S_IXOTH) could not be protected, failing safely!");
     seccomp_release(ctx);
     exit(EXIT_FAILURE);
   }
