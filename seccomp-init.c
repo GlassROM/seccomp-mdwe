@@ -73,8 +73,18 @@ int main(int argc, char *argv[]) {
      /sbin/init with no additional arguments.
   */
   if (argc > 1) {
-    fprintf(stderr, "Executing /sbin/init with user arguments...\n");
-    execvp("/sbin/init", &argv[1]);
+    char **new_argv = malloc(sizeof(char *) * (argc + 1));
+    if (!new_argv) {
+      perror("malloc failed, triggering kernel panic!");
+      exit(EXIT_FAILURE);
+    }
+    new_argv[0] = "/sbin/init";
+    for (int i = 1; i < argc; i++) {
+      new_argv[i] = argv[i];
+    }
+    new_argv[argc] = NULL;
+    execvp("/sbin/init", new_argv);
+    free(new_argv);
   } else {
     fprintf(stderr, "Executing /sbin/init with no arguments...\n");
     char *init_argv[] = {"/sbin/init", NULL};
