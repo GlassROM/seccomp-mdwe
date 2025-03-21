@@ -68,6 +68,14 @@ int main(int argc, char *argv[]) {
     perror("prctl(PR_SET_DUMPABLE) failed, triggering kernel panic!");
     exit(EXIT_FAILURE);
   }
+  if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(prctl), 2,
+                       SCMP_CMP(0, SCMP_CMP_EQ, PR_SET_DUMPABLE),
+                       SCMP_CMP(1, SCMP_CMP_EQ, 1)) < 0) {
+    perror("prctl(PR_SET_DUMPABLE,1) filter could not be added, triggering "
+           "kernel panic!");
+    seccomp_release(ctx);
+    exit(EXIT_FAILURE);
+  }
 
   fprintf(stderr, "Setting up seccomp filters...\n");
   setup_seccomp();
