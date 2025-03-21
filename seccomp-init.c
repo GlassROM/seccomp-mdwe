@@ -84,6 +84,9 @@ int main(int argc, char *argv[]) {
     }
     new_argv[argc] = NULL;
     execvp("/sbin/init", new_argv);
+    /* Note: If execvp succeeds, this free() is never reached because the
+   process image is replaced. In case execvp fails, the OS will reclaim the
+   allocated memory on process termination. */
     free(new_argv);
   } else {
     fprintf(stderr, "Executing /sbin/init with no arguments...\n");
