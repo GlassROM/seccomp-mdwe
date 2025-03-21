@@ -63,6 +63,12 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
+  /* Prevent core dumps */
+  if (prctl(PR_SET_DUMPABLE, 0, 0, 0, 0) < 0) {
+    perror("prctl(PR_SET_DUMPABLE) failed, triggering kernel panic!");
+    exit(EXIT_FAILURE);
+  }
+
   fprintf(stderr, "Setting up seccomp filters...\n");
   setup_seccomp();
   fprintf(stderr, "Seccomp filters set up successfully.\n");
