@@ -29,14 +29,14 @@ static inline void setup_seccomp(void) {
     }
 
     /* Block rseq syscall. */
-    if (seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(rseq), 0) < 0) {
+    if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(rseq), 0) < 0) {
         perror("rseq could not be protected, triggering kernel panic!");
         seccomp_release(ctx);
         exit(EXIT_FAILURE);
     }
 
     /* Block kcmp syscall. */
-    if (seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(kcmp), 0) < 0) {
+    if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(kcmp), 0) < 0) {
         perror("kcmp could not be protected, triggering kernel panic!");
         seccomp_release(ctx);
         exit(EXIT_FAILURE);
