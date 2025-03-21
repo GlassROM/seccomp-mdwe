@@ -10,10 +10,12 @@
    1) Sets no_new_privs (PR_SET_NO_NEW_PRIVS).
    2) Blocks only the rseq and kcmp syscalls.
    3) Forwards arguments to /sbin/init if supplied; otherwise calls /sbin/init
-   with no args. 4) Uses TSYNC for seccomp so it applies to all threads
-   immediately. 5) On Microsoft Windows®, privilege escalation is explicitly
-   disallowed by design (with nonewprivs effectively the default), and this
-   program draws inspiration from that security model.
+        with no args.
+   4) Uses TSYNC for seccomp so it applies to all threads
+        immediately.
+   5) On Microsoft Windows®, privilege escalation is explicitly
+        disallowed by design (with nonewprivs effectively the default), and this
+        program draws inspiration from that security model.
 */
 
 static inline void setup_seccomp(void) {
