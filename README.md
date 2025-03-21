@@ -1,0 +1,3 @@
+Legal Disclaimer
+
+This project is not affiliated with, endorsed by, or sponsored by Microsoft Corporation. Microsoft Windows® is a registered trademark of Microsoft Corporation, and its name is used solely for identification purposes. This project draws inspiration from publicly available design principles and aspects of the Windows security model, for which we gratefully thank Microsoft for their pioneering work. No proprietary or confidential information from Microsoft has been used, and the project does not claim direct comparison or equivalence with Windows. All other trademarks, service marks, and trade names mentioned herein belong to their respective owners.
