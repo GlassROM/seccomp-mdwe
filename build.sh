@@ -4,3 +4,4 @@ FLAGS='-fno-strict-overflow -fno-strict-aliasing -fno-delete-null-pointer-checks
 
 clang seccomp-mdwe.c -DGL_PERMISSIVE -lseccomp $FLAGS -o seccomp-error
 clang seccomp-mdwe.c -lseccomp $FLAGS -o seccomp-strict
+clang seccomp-init.c -lseccomp $FLAGS -o seccomp-init
