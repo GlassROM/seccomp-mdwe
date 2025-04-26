@@ -185,7 +185,7 @@ static inline void setup_seccomp(void) {
 
   if (seccomp_rule_add(
           ctx, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(prctl), 2,
-          SCMP_CMP(0, SCMP_CMP_MASKED_EQ, PR_SET_DUMPABLE, PR_SET_DUMPABLE),
+          SCMP_CMP(0, SCMP_CMP_EQ, PR_SET_DUMPABLE, PR_SET_DUMPABLE),
           SCMP_CMP(1, SCMP_CMP_MASKED_EQ, 1, 1)) < 0) {
     perror("prctl(PR_SET_DUMPABLE,1) filter could not be added, triggering "
            "kernel panic!");
