@@ -79,6 +79,23 @@ static inline void setup_seccomp(void) {
     exit(EXIT_FAILURE);
   }
 
+  /* Deny any direct memory-writes via process_vm_writev */
+  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(process_vm_writev), 0) < 0) {
+    perror("process_vm_writev could not be protected, failing safely!");
+    seccomp_release(ctx);
+    exit(EXIT_FAILURE);
+  }
+
+  /* Deny fexecve via execveat(..., AT_EMPTY_PATH) */
+  if (seccomp_rule_add(
+          ctx, GL_SC_ACTION, SCMP_SYS(execveat), 1,
+          /* flags argument is index 4 */
+          SCMP_CMP(4, SCMP_CMP_MASKED_EQ, AT_EMPTY_PATH, AT_EMPTY_PATH)) < 0) {
+    perror("execveat (AT_EMPTY_PATH) could not be protected, failing safely!");
+    seccomp_release(ctx);
+    exit(EXIT_FAILURE);
+  }
+
   if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(chmod), 1,
                        SCMP_A1(SCMP_CMP_MASKED_EQ, S_IXUSR, S_IXUSR)) < 0) {
     perror("chmod user-execute could not be protected, failing safely!");
