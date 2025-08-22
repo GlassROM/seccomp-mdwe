@@ -220,6 +220,7 @@ static inline void setup_seccomp(void) {
 }
 
 int main(int argc, char *argv[]) {
+  if (argc < 1 || !argv[0]) __builtin_trap();
   /* Prevent privilege escalation after exec. */
   if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) < 0) {
     perror("prctl(PR_SET_NO_NEW_PRIVS) failed, failing safely!");
