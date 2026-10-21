@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
 parser.add_argument("--build-dir", type=Path, required=True)
 parser.add_argument("--cc", default="clang")
+parser.add_argument("--strict-warnings", action="store_true")
 args = parser.parse_args()
 out = args.build_dir.resolve()
 tools = out / "tests"
@@ -21,6 +22,9 @@ for source in ("probe", "init-driver", "deny-mdwe", "mdwe-only"):
                "-Wpedantic", "-Werror", "-Wconversion", "-Wshadow",
                "-fuse-ld=lld", str(ROOT / "tests" / (source + ".c")),
                "-o", str(tools / source)]
+    if args.strict_warnings:
+        command += ["-Weverything", "-Wno-declaration-after-statement",
+                    "-Wno-unsafe-buffer-usage", "-Wno-disabled-macro-expansion"]
     if source in ("init-driver", "deny-mdwe"):
         command += ["-L/usr/local/lib", "-Wl,--no-as-needed", "-lirralloc",
                     "-Wl,--as-needed", "-lseccomp"]
@@ -94,6 +98,8 @@ with tempfile.TemporaryDirectory(prefix="seccomp-check-") as work:
     run("init args forwarding", [init, "--entry", "single", "two words"])
     result = subprocess.run([tools / "mdwe-only", probe, "mdwe"], capture_output=True)
     if result.returncode == 0:
+        run("MDWE alone permits a new anonymous RX mapping",
+            [tools / "mdwe-only", probe, "mmap-rx-allowed"])
         for name in ("seccomp-error", "seccomp-strict"):
             run(name + " MDWE inherited across exec", [out / name, probe, "mdwe"])
             run(name + " MDWE inherited across fork and exec",

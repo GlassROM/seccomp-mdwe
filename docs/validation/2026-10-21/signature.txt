@@ -1,0 +1,9 @@
+[GNUPG:] NEWSIG
+[GNUPG:] KEY_CONSIDERED DE9452CE46F42094907F108B44D1C0F82525FE49 0
+[GNUPG:] SIG_ID ygGFtviEzdnvAkS4liK+5L2/Goc 2017-02-24 1487904794
+[GNUPG:] GOODSIG 44D1C0F82525FE49 Bradley Spengler (spender) <spender@grsecurity.net>
+[GNUPG:] VALIDSIG DE9452CE46F42094907F108B44D1C0F82525FE49 2017-02-24 1487904794 0 4 0 1 10 00 DE9452CE46F42094907F108B44D1C0F82525FE49
+gpgv: Signature made Thu Feb 23 23:53:14 2017 -03
+gpgv:                using RSA key 44D1C0F82525FE49
+gpgv: Good signature from "Bradley Spengler (spender) <spender@grsecurity.net>"
+gpgv:                 aka "Bradley Spengler <brad.spengler@grsecurity.net>"

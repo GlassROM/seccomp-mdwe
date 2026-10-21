@@ -71,6 +71,12 @@ int main(int argc, char *argv[]) {
   if (strcmp(operation, "mmap-rx") == 0) {
     return mapping(PROT_READ | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS);
   }
+  if (strcmp(operation, "mmap-rx-allowed") == 0) {
+    void *address = mmap(NULL, 4096, PROT_READ | PROT_EXEC,
+                         MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    return address != MAP_FAILED && munmap(address, 4096) == 0 ? EXIT_SUCCESS
+                                                               : EXIT_FAILURE;
+  }
   if (strcmp(operation, "mmap-shared-rx") == 0 ||
       strcmp(operation, "mmap-validate-rx") == 0) {
     const int fd = open("mapping-file", O_CREAT | O_RDWR, 0600);

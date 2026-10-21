@@ -85,7 +85,7 @@ format-check:
 	$(CLANG_FORMAT) --dry-run --Werror $(FORMAT_SOURCES)
 
 check: all format-check
-	python3 tests/check.py --build-dir $(OUT) --cc $(CC)
+	python3 tests/check.py --build-dir $(OUT) --cc $(CC) $(if $(filter development,$(MODE)),--strict-warnings,)
 
 clean:
 	rm -rf build

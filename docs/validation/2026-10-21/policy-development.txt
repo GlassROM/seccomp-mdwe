@@ -1,0 +1,173 @@
+ln -sfn build/development/seccomp-error seccomp-error
+ln -sfn build/development/seccomp-strict seccomp-strict
+ln -sfn build/development/seccomp-init seccomp-init
+clang-format --dry-run --Werror seccomp-mdwe.c seccomp-init.c sandbox-common.h tests/deny-mdwe.c tests/init-driver.c tests/mdwe-only.c tests/probe.c
+python3 tests/check.py --build-dir build/development --cc clang --strict-warnings
+PASS seccomp-error query 0xffffffff
+PASS seccomp-error query 0xffffffffffffffff
+PASS seccomp-error query 0x12345678ffffffff
+PASS seccomp-error deny personality 0
+PASS seccomp-error deny personality 0x400000
+PASS seccomp-error deny personality 0x100000000
+PASS seccomp-error deny personality 0xffffffff00400000
+PASS seccomp-error nnp
+PASS seccomp-error dumpable
+PASS seccomp-error rw
+PASS seccomp-error file-rx
+PASS seccomp-error foreign ABI
+PASS seccomp-error mmap-wx
+PASS seccomp-error mmap-rx
+PASS seccomp-error mmap-shared-rx
+PASS seccomp-error mmap-validate-rx
+PASS seccomp-error mprotect
+PASS seccomp-error pkey-mprotect
+PASS seccomp-error memfd
+PASS seccomp-error shmat
+PASS seccomp-error ptrace
+PASS seccomp-error process-vm
+PASS seccomp-error io-uring
+PASS seccomp-error io-uring-enter
+PASS seccomp-error io-uring-register
+PASS seccomp-error default filesystem chmod
+PASS seccomp-error filesystem='' chmod
+PASS seccomp-error filesystem='1' chmod
+PASS seccomp-error filesystem='0' chmod
+PASS seccomp-error default filesystem fchmod
+PASS seccomp-error filesystem='' fchmod
+PASS seccomp-error filesystem='1' fchmod
+PASS seccomp-error filesystem='0' fchmod
+PASS seccomp-error default filesystem fchmodat
+PASS seccomp-error filesystem='' fchmodat
+PASS seccomp-error filesystem='1' fchmodat
+PASS seccomp-error filesystem='0' fchmodat
+PASS seccomp-error default filesystem fchmodat2
+PASS seccomp-error filesystem='' fchmodat2
+PASS seccomp-error filesystem='1' fchmodat2
+PASS seccomp-error filesystem='0' fchmodat2
+PASS seccomp-error default filesystem creat
+PASS seccomp-error filesystem='' creat
+PASS seccomp-error filesystem='1' creat
+PASS seccomp-error filesystem='0' creat
+PASS seccomp-error default filesystem open
+PASS seccomp-error filesystem='' open
+PASS seccomp-error filesystem='1' open
+PASS seccomp-error filesystem='0' open
+PASS seccomp-error default filesystem openat
+PASS seccomp-error filesystem='' openat
+PASS seccomp-error filesystem='1' openat
+PASS seccomp-error filesystem='0' openat
+PASS seccomp-error default filesystem tmpfile
+PASS seccomp-error filesystem='' tmpfile
+PASS seccomp-error filesystem='1' tmpfile
+PASS seccomp-error filesystem='0' tmpfile
+PASS seccomp-error default filesystem openat2
+PASS seccomp-error filesystem='' openat2
+PASS seccomp-error filesystem='1' openat2
+PASS seccomp-error filesystem='0' openat2
+PASS seccomp-error default filesystem execveat
+PASS seccomp-error filesystem='' execveat
+PASS seccomp-error filesystem='1' execveat
+PASS seccomp-error filesystem='0' execveat
+PASS seccomp-error no payload
+PASS seccomp-error missing payload
+PASS seccomp-error MDWE failure 22 query
+PASS seccomp-error MDWE failure 22 mmap-rx
+PASS seccomp-error MDWE failure 38 query
+PASS seccomp-error MDWE failure 38 mmap-rx
+PASS seccomp-error MDWE failure 1 query
+PASS seccomp-error MDWE failure 1 mmap-rx
+PASS seccomp-strict query 0xffffffff
+PASS seccomp-strict query 0xffffffffffffffff
+PASS seccomp-strict query 0x12345678ffffffff
+PASS seccomp-strict deny personality 0
+PASS seccomp-strict deny personality 0x400000
+PASS seccomp-strict deny personality 0x100000000
+PASS seccomp-strict deny personality 0xffffffff00400000
+PASS seccomp-strict nnp
+PASS seccomp-strict dumpable
+PASS seccomp-strict rw
+PASS seccomp-strict file-rx
+PASS seccomp-strict foreign ABI
+PASS seccomp-strict mmap-wx
+PASS seccomp-strict mmap-rx
+PASS seccomp-strict mmap-shared-rx
+PASS seccomp-strict mmap-validate-rx
+PASS seccomp-strict mprotect
+PASS seccomp-strict pkey-mprotect
+PASS seccomp-strict memfd
+PASS seccomp-strict shmat
+PASS seccomp-strict ptrace
+PASS seccomp-strict process-vm
+PASS seccomp-strict io-uring
+PASS seccomp-strict io-uring-enter
+PASS seccomp-strict io-uring-register
+PASS seccomp-strict default filesystem chmod
+PASS seccomp-strict filesystem='' chmod
+PASS seccomp-strict filesystem='1' chmod
+PASS seccomp-strict filesystem='0' chmod
+PASS seccomp-strict default filesystem fchmod
+PASS seccomp-strict filesystem='' fchmod
+PASS seccomp-strict filesystem='1' fchmod
+PASS seccomp-strict filesystem='0' fchmod
+PASS seccomp-strict default filesystem fchmodat
+PASS seccomp-strict filesystem='' fchmodat
+PASS seccomp-strict filesystem='1' fchmodat
+PASS seccomp-strict filesystem='0' fchmodat
+PASS seccomp-strict default filesystem fchmodat2
+PASS seccomp-strict filesystem='' fchmodat2
+PASS seccomp-strict filesystem='1' fchmodat2
+PASS seccomp-strict filesystem='0' fchmodat2
+PASS seccomp-strict default filesystem creat
+PASS seccomp-strict filesystem='' creat
+PASS seccomp-strict filesystem='1' creat
+PASS seccomp-strict filesystem='0' creat
+PASS seccomp-strict default filesystem open
+PASS seccomp-strict filesystem='' open
+PASS seccomp-strict filesystem='1' open
+PASS seccomp-strict filesystem='0' open
+PASS seccomp-strict default filesystem openat
+PASS seccomp-strict filesystem='' openat
+PASS seccomp-strict filesystem='1' openat
+PASS seccomp-strict filesystem='0' openat
+PASS seccomp-strict default filesystem tmpfile
+PASS seccomp-strict filesystem='' tmpfile
+PASS seccomp-strict filesystem='1' tmpfile
+PASS seccomp-strict filesystem='0' tmpfile
+PASS seccomp-strict default filesystem openat2
+PASS seccomp-strict filesystem='' openat2
+PASS seccomp-strict filesystem='1' openat2
+PASS seccomp-strict filesystem='0' openat2
+PASS seccomp-strict default filesystem execveat
+PASS seccomp-strict filesystem='' execveat
+PASS seccomp-strict filesystem='1' execveat
+PASS seccomp-strict filesystem='0' execveat
+PASS seccomp-strict no payload
+PASS seccomp-strict missing payload
+PASS seccomp-strict MDWE failure 22 query
+PASS seccomp-strict MDWE failure 22 mmap-rx
+PASS seccomp-strict MDWE failure 38 query
+PASS seccomp-strict MDWE failure 38 mmap-rx
+PASS seccomp-strict MDWE failure 1 query
+PASS seccomp-strict MDWE failure 1 mmap-rx
+PASS init query 0xffffffff
+PASS init query 0xffffffffffffffff
+PASS init query 0x12345678ffffffff
+PASS init deny personality 0
+PASS init deny personality 0x400000
+PASS init deny personality 0x100000000
+PASS init deny personality 0xffffffff00400000
+PASS init rseq
+PASS init kcmp
+PASS init dumpable
+PASS init nnp
+PASS init no-mdwe
+PASS init rw
+PASS init foreign ABI
+PASS init no args forwarding
+PASS init args forwarding
+PASS MDWE alone permits a new anonymous RX mapping
+PASS seccomp-error MDWE inherited across exec
+PASS seccomp-error MDWE inherited across fork and exec
+PASS seccomp-strict MDWE inherited across exec
+PASS seccomp-strict MDWE inherited across fork and exec
+167 policy checks passed

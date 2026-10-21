@@ -1,0 +1,57 @@
+{
+  "date_utc": "2026-10-21T13:19:59Z",
+  "revision": "a5eb448f04de5cffa4f52e38276a04370f1aa5be",
+  "uname": [
+    "Linux",
+    "0fc1f6d6c8e3",
+    "6.18.55",
+    "#1 SMP Wed Oct 14 19:45:18 UTC 2026",
+    "x86_64",
+    "x86_64"
+  ],
+  "os_release": "PRETTY_NAME=\"Ubuntu 24.04.3 LTS\"\nNAME=\"Ubuntu\"\nVERSION_ID=\"24.04\"\nVERSION=\"24.04.3 LTS (Noble Numbat)\"\nVERSION_CODENAME=noble\nID=ubuntu\nID_LIKE=debian\nHOME_URL=\"https://www.ubuntu.com/\"\nSUPPORT_URL=\"https://help.ubuntu.com/\"\nBUG_REPORT_URL=\"https://bugs.launchpad.net/ubuntu/\"\nPRIVACY_POLICY_URL=\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"\nUBUNTU_CODENAME=noble\nLOGO=ubuntu-logo\n",
+  "gcc": "gcc (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
+  "archive_url": "https://grsecurity.net/~spender/paxtest-0.9.15.tar.gz",
+  "archive_sha256": "d553848431fd8c2ab6c8361b62e5cedfed1cc1d60088241f4a33d2af15dd667f",
+  "signer_fingerprint": "DE9452CE46F42094907F108B44D1C0F82525FE49",
+  "fingerprint_source": "https://grsecurity.net/download.php",
+  "binary_sha256": {
+    "seccomp-error": "e8de533b00ee1b892c7c429e43eda288f5972f76fb3da3fd557becd672655925",
+    "tests/mdwe-only": "a149dc7adecaf62e121a872c4d83229cff6601a974d6532bfe1b8f34990af82b",
+    "tests/probe": "10c7b95ffd24acf14560bacd89b63127ac335387f564e19494409f6031452154"
+  },
+  "runs": [
+    {
+      "name": "baseline",
+      "command": [
+        "./paxtest",
+        "blackhat",
+        "/workspace/scratch/85860de39f2b/seccomp-mdwe/build/paxtest-final/baseline.txt"
+      ],
+      "returncode": 0,
+      "seconds": 33.52333983900007
+    },
+    {
+      "name": "mdwe-only",
+      "command": [
+        "/workspace/scratch/85860de39f2b/seccomp-mdwe/build/release/tests/mdwe-only",
+        "./paxtest",
+        "blackhat",
+        "/workspace/scratch/85860de39f2b/seccomp-mdwe/build/paxtest-final/mdwe-only.txt"
+      ],
+      "returncode": 0,
+      "seconds": 32.88814403499964
+    },
+    {
+      "name": "seccomp-error",
+      "command": [
+        "/workspace/scratch/85860de39f2b/seccomp-mdwe/build/release/seccomp-error",
+        "./paxtest",
+        "blackhat",
+        "/workspace/scratch/85860de39f2b/seccomp-mdwe/build/paxtest-final/seccomp-error.txt"
+      ],
+      "returncode": 0,
+      "seconds": 32.95934278000004
+    }
+  ]
+}

@@ -5,6 +5,9 @@ int init_entry(int argc, char *argv[]);
 #include "../seccomp-init.c"
 #undef main
 
+/* GNU ld/LLD require this reserved spelling for --wrap=execv. */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreserved-identifier"
 int __wrap_execv(const char *path, char *const argv[]);
 
 int __wrap_execv(const char *path, char *const argv[]) {
@@ -20,6 +23,7 @@ int __wrap_execv(const char *path, char *const argv[]) {
   }
   _Exit(EXIT_FAILURE);
 }
+#pragma clang diagnostic pop
 
 int main(int argc, char *argv[]) {
   if (argc >= 2 && strcmp(argv[1], "--entry") == 0) {
