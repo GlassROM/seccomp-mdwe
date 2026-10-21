@@ -24,12 +24,19 @@ not Linux's separate strict seccomp mode.
 | mprotect, pkey_mprotect | Deny calls containing PROT_EXEC, including redundant executable protections |
 | mmap | Deny writable/executable, anonymous/executable and shared/executable combinations |
 | shmat | Deny SHM_EXEC |
-| memfd_create, ptrace, process_vm_writev | Deny |
+| memfd_create | Require MFD_NOEXEC_SEAL and deny MFD_EXEC |
+| ptrace, process_vm_writev | Deny |
 | io_uring_setup, io_uring_enter, io_uring_register | Deny |
 | personality | Allow queries with lower 32 bits equal to 0xffffffff; deny changes with EPERM |
 | prctl(PR_SET_DUMPABLE) | Deny nonzero settings with EPERM |
 
 Private executable file mappings remain allowed for dynamic loading.
+memfd_create is permitted when MFD_NOEXEC_SEAL is set and MFD_EXEC is absent,
+including compatible CLOEXEC and sealing flags. The kernel clears the file's
+execute bits and sets F_SEAL_EXEC to prevent adding them later. This seal does
+not prohibit executable mmap: private RX mappings of these files remain allowed
+by this policy. See the
+[kernel API description](https://docs.kernel.org/userspace-api/mfd_noexec.html).
 The launcher rejects an inherited READ_IMPLIES_EXEC personality before loading
 the policy, since readable mappings could otherwise become executable without
 PROT_EXEC.

@@ -1,10 +1,19 @@
 #include "sandbox-common.h"
 
 #include <fcntl.h>
+#include <linux/memfd.h>
 #include <stdbool.h>
 #include <sys/mman.h>
 #include <sys/shm.h>
 #include <sys/stat.h>
+
+/* Stable Linux UAPI values for builds using older development headers. */
+#ifndef MFD_NOEXEC_SEAL
+#define MFD_NOEXEC_SEAL 0x0008U
+#endif
+#ifndef MFD_EXEC
+#define MFD_EXEC 0x0010U
+#endif
 
 #ifdef GL_PERMISSIVE
 #define GL_SC_ACTION SCMP_ACT_ERRNO(EPERM)
@@ -30,6 +39,14 @@ static void enable_mdwe(void) {
 }
 
 static void add_memory_filters(scmp_filter_ctx ctx) {
+  /* Require an explicit no-exec seal independently of the namespace default.
+     Conflicting executable requests remain denied in either policy mode. */
+  check_seccomp(rule1(ctx, GL_SC_ACTION, SCMP_SYS(memfd_create),
+                      SCMP_A1(SCMP_CMP_MASKED_EQ, MFD_NOEXEC_SEAL, 0)),
+                ctx, "require non-executable memfd");
+  check_seccomp(rule1(ctx, GL_SC_ACTION, SCMP_SYS(memfd_create),
+                      SCMP_A1(SCMP_CMP_MASKED_EQ, MFD_EXEC, MFD_EXEC)),
+                ctx, "deny executable memfd");
   check_seccomp(rule1(ctx, GL_SC_ACTION, SCMP_SYS(mprotect),
                       SCMP_A2(SCMP_CMP_MASKED_EQ, PROT_EXEC, PROT_EXEC)),
                 ctx, "protect mprotect");
@@ -54,10 +71,9 @@ static void add_memory_filters(scmp_filter_ctx ctx) {
                       SCMP_A2(SCMP_CMP_MASKED_EQ, SHM_EXEC, SHM_EXEC)),
                 ctx, "protect executable shmat");
 
-  const int denied[] = {
-      SCMP_SYS(memfd_create),      SCMP_SYS(ptrace),
-      SCMP_SYS(process_vm_writev), SCMP_SYS(io_uring_setup),
-      SCMP_SYS(io_uring_enter),    SCMP_SYS(io_uring_register)};
+  const int denied[] = {SCMP_SYS(ptrace), SCMP_SYS(process_vm_writev),
+                        SCMP_SYS(io_uring_setup), SCMP_SYS(io_uring_enter),
+                        SCMP_SYS(io_uring_register)};
   for (size_t i = 0; i < sizeof(denied) / sizeof(denied[0]); ++i) {
     check_seccomp(rule0(ctx, GL_SC_ACTION, denied[i]), ctx,
                   "protect memory syscall");

@@ -54,7 +54,8 @@ def run(label, command, expected=0, filesystem=None, warning=False):
 probe = tools / "probe"
 memory = ("mmap-wx", "mmap-rx", "mmap-shared-rx", "mmap-validate-rx",
           "mprotect", "pkey-mprotect", "memfd", "shmat", "ptrace", "process-vm",
-          "io-uring", "io-uring-enter", "io-uring-register")
+          "io-uring", "io-uring-enter", "io-uring-register", "memfd-exec",
+          "memfd-conflict", "memfd-sealing")
 filesystem_calls = ("chmod", "fchmod", "fchmodat", "fchmodat2", "creat", "open",
                     "openat", "tmpfile", "openat2", "execveat")
 with tempfile.TemporaryDirectory(prefix="seccomp-check-") as work:
@@ -70,6 +71,10 @@ with tempfile.TemporaryDirectory(prefix="seccomp-check-") as work:
         for operation in memory:
             expected = 0 if name == "seccomp-error" else -signal.SIGSYS
             run(name + " " + operation, [wrapper, probe, operation], expected)
+        for flags in ("8", "9", "10", "11", "0x100000008"):
+            for filesystem in (None, "1"):
+                run(name + " noexec memfd " + flags + " filesystem=" + repr(filesystem),
+                    [wrapper, probe, "memfd-noexec", flags], filesystem=filesystem)
         for operation in filesystem_calls:
             run(name + " default filesystem " + operation,
                 [wrapper, probe, operation, "allowed"])
@@ -80,7 +85,7 @@ with tempfile.TemporaryDirectory(prefix="seccomp-check-") as work:
         run(name + " no payload", [wrapper], 1)
         run(name + " missing payload", [wrapper, "/definitely/absent"], 1)
         for error in (errno.EINVAL, errno.ENOSYS, errno.EPERM):
-            for operation in ("query", "mmap-rx"):
+            for operation in ("query", "mmap-rx", "memfd-noexec"):
                 tail = ["0xffffffff"] if operation == "query" else []
                 expected = -signal.SIGSYS if name == "seccomp-strict" and operation == "mmap-rx" else 0
                 run(name + " MDWE failure " + str(error) + " " + operation,

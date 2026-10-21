@@ -124,7 +124,7 @@ The runner requires a fresh work directory.
 [Recorded evidence](docs/validation/2026-10-21/README.md) includes raw output,
 commands and run conditions.
 
-Release and development each passed 167 focused policy checks. These include
+Release and development each passed 199 focused policy checks. These include
 MDWE failure handling and inheritance, personality forms, filesystem opt-in,
 error/kill behavior, foreign ABI rejection and intercepted init forwarding.
 Static analysis reported no findings. This is one environment and one legacy

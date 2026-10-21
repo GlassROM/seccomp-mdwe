@@ -24,6 +24,9 @@ seccomp-init is an independent pre-init shim. Read [README.md](README.md),
   modes so callers can use their compatibility fallback.
 - Attempt PR_SET_MDWE with PR_MDWE_REFUSE_EXEC_GAIN in both payload modes.
   Failure warns and execution continues with seccomp. Preserve inheritance.
+- Permit memfd_create only with MFD_NOEXEC_SEAL set and MFD_EXEC absent.
+  Preserve compatible flags such as MFD_CLOEXEC and MFD_ALLOW_SEALING.
+  The noexec seal protects file execute bits; it does not forbid executable mmap.
 - Personality queries are allowed. Changes return EPERM in both programs,
   including the payload kill policy. Match the kernel's lower 32-bit argument.
 - The init shim has its own policy and executes /sbin/init. It does not install

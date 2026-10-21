@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <fcntl.h>
+#include <linux/memfd.h>
 #include <linux/openat2.h>
 #include <linux/prctl.h>
 #include <stdint.h>
@@ -12,6 +13,17 @@
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+
+/* Match the stable UAPI when the host headers predate noexec memfds. */
+#ifndef MFD_NOEXEC_SEAL
+#define MFD_NOEXEC_SEAL 0x0008U
+#endif
+#ifndef MFD_EXEC
+#define MFD_EXEC 0x0010U
+#endif
+#ifndef F_SEAL_EXEC
+#define F_SEAL_EXEC 0x0020
+#endif
 
 static int denied_errno(long result, int expected_errno) {
   if (result == -1 && errno == expected_errno) {
@@ -130,6 +142,44 @@ int main(int argc, char *argv[]) {
   }
   if (strcmp(operation, "memfd") == 0) {
     return denied(syscall(SYS_memfd_create, "probe", 0U));
+  }
+  if (strcmp(operation, "memfd-exec") == 0) {
+    return denied(syscall(SYS_memfd_create, "probe", MFD_EXEC));
+  }
+  if (strcmp(operation, "memfd-conflict") == 0) {
+    return denied(
+        syscall(SYS_memfd_create, "probe", MFD_NOEXEC_SEAL | MFD_EXEC));
+  }
+  if (strcmp(operation, "memfd-sealing") == 0) {
+    return denied(syscall(SYS_memfd_create, "probe", MFD_ALLOW_SEALING));
+  }
+  if (strcmp(operation, "memfd-noexec") == 0) {
+    const unsigned long flags =
+        argc == 3 ? strtoul(argv[2], NULL, 0) : MFD_NOEXEC_SEAL;
+    const long result = syscall(SYS_memfd_create, "probe", flags);
+    if (result < 0) {
+      perror("memfd_create with MFD_NOEXEC_SEAL");
+      return EXIT_FAILURE;
+    }
+    const int fd = (int)result;
+    struct stat status;
+    const int seals = fcntl(fd, F_GET_SEALS);
+    const int descriptor_flags = fcntl(fd, F_GETFD);
+    if (fstat(fd, &status) < 0 || seals < 0 || descriptor_flags < 0 ||
+        (status.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0 ||
+        (seals & F_SEAL_EXEC) == 0 ||
+        ((descriptor_flags & FD_CLOEXEC) != 0) !=
+            ((flags & MFD_CLOEXEC) != 0) ||
+        ftruncate(fd, 4096) < 0) {
+      return EXIT_FAILURE;
+    }
+    void *address = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (address == MAP_FAILED) {
+      return EXIT_FAILURE;
+    }
+    ((unsigned char *)address)[0] = 0x5a;
+    return munmap(address, 4096) == 0 && close(fd) == 0 ? EXIT_SUCCESS
+                                                        : EXIT_FAILURE;
   }
   if (strcmp(operation, "shmat") == 0) {
     return denied(syscall(SYS_shmat, -1, NULL, SHM_EXEC));
