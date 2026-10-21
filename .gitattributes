@@ -6,3 +6,5 @@ Makefile text
 toolchain.mk text
 *.png binary
 *.sig binary
+# Recorded command output retains the producer's trailing spaces verbatim.
+docs/validation/**/*.txt whitespace=-blank-at-eol
