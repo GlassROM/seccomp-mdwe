@@ -82,6 +82,7 @@ subprocess.run(["sh", "genpaxtest", *values["TESTS"].split()], cwd=source, check
 
 environment = dict(os.environ)
 environment.pop("SECCOMP_MDWE_FS", None)
+environment.pop("SECCOMP_MDWE_DENY_MEMFD", None)
 environment.pop("LD_PRELOAD", None)
 probe = build / "tests" / "probe"
 mdwe = build / "tests" / "mdwe-only"

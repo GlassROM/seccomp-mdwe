@@ -38,15 +38,20 @@ static void enable_mdwe(void) {
   }
 }
 
-static void add_memory_filters(scmp_filter_ctx ctx) {
-  /* Require an explicit no-exec seal independently of the namespace default.
-     Conflicting executable requests remain denied in either policy mode. */
-  check_seccomp(rule1(ctx, GL_SC_ACTION, SCMP_SYS(memfd_create),
-                      SCMP_A1(SCMP_CMP_MASKED_EQ, MFD_NOEXEC_SEAL, 0)),
-                ctx, "require non-executable memfd");
-  check_seccomp(rule1(ctx, GL_SC_ACTION, SCMP_SYS(memfd_create),
-                      SCMP_A1(SCMP_CMP_MASKED_EQ, MFD_EXEC, MFD_EXEC)),
-                ctx, "deny executable memfd");
+static void add_memory_filters(scmp_filter_ctx ctx, bool deny_memfd) {
+  if (deny_memfd) {
+    check_seccomp(rule0(ctx, GL_SC_ACTION, SCMP_SYS(memfd_create)), ctx,
+                  "deny all memfd creation");
+  } else {
+    /* Require an explicit no-exec seal independently of the namespace default.
+       Conflicting executable requests remain denied in either policy mode. */
+    check_seccomp(rule1(ctx, GL_SC_ACTION, SCMP_SYS(memfd_create),
+                        SCMP_A1(SCMP_CMP_MASKED_EQ, MFD_NOEXEC_SEAL, 0)),
+                  ctx, "require non-executable memfd");
+    check_seccomp(rule1(ctx, GL_SC_ACTION, SCMP_SYS(memfd_create),
+                        SCMP_A1(SCMP_CMP_MASKED_EQ, MFD_EXEC, MFD_EXEC)),
+                  ctx, "deny executable memfd");
+  }
   check_seccomp(rule1(ctx, GL_SC_ACTION, SCMP_SYS(mprotect),
                       SCMP_A2(SCMP_CMP_MASKED_EQ, PROT_EXEC, PROT_EXEC)),
                 ctx, "protect mprotect");
@@ -124,10 +129,10 @@ static void add_filesystem_filters(scmp_filter_ctx ctx) {
       ctx, "protect execveat AT_EMPTY_PATH");
 }
 
-static void setup_seccomp(bool filesystem) {
+static void setup_seccomp(bool filesystem, bool deny_memfd) {
   scmp_filter_ctx ctx = new_filter();
   add_common_filters(ctx);
-  add_memory_filters(ctx);
+  add_memory_filters(ctx, deny_memfd);
   if (filesystem) {
     add_filesystem_filters(ctx);
   }
@@ -142,7 +147,8 @@ int main(int argc, char *argv[]) {
   }
   prepare_process();
   enable_mdwe();
-  setup_seccomp(getenv("SECCOMP_MDWE_FS") != NULL);
+  setup_seccomp(getenv("SECCOMP_MDWE_FS") != NULL,
+                getenv("SECCOMP_MDWE_DENY_MEMFD") != NULL);
   execvp(argv[1], &argv[1]);
   perror("execvp");
   return EXIT_FAILURE;

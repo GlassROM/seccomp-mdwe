@@ -153,10 +153,14 @@ int main(int argc, char *argv[]) {
   if (strcmp(operation, "memfd-sealing") == 0) {
     return denied(syscall(SYS_memfd_create, "probe", MFD_ALLOW_SEALING));
   }
-  if (strcmp(operation, "memfd-noexec") == 0) {
+  if (strcmp(operation, "memfd-noexec") == 0 ||
+      strcmp(operation, "memfd-denied") == 0) {
     const unsigned long flags =
         argc == 3 ? strtoul(argv[2], NULL, 0) : MFD_NOEXEC_SEAL;
     const long result = syscall(SYS_memfd_create, "probe", flags);
+    if (strcmp(operation, "memfd-denied") == 0) {
+      return denied(result);
+    }
     if (result < 0) {
       perror("memfd_create with MFD_NOEXEC_SEAL");
       return EXIT_FAILURE;

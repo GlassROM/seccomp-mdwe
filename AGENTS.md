@@ -24,7 +24,9 @@ seccomp-init is an independent pre-init shim. Read [README.md](README.md),
   modes so callers can use their compatibility fallback.
 - Attempt PR_SET_MDWE with PR_MDWE_REFUSE_EXEC_GAIN in both payload modes.
   Failure warns and execution continues with seccomp. Preserve inheritance.
-- Permit memfd_create only with MFD_NOEXEC_SEAL set and MFD_EXEC absent.
+- If SECCOMP_MDWE_DENY_MEMFD is present, deny every memfd_create call using
+  the payload mode's denial action. Empty and 0 values enable this switch.
+  Otherwise permit memfd_create only with MFD_NOEXEC_SEAL set and MFD_EXEC absent.
   Preserve compatible flags such as MFD_CLOEXEC and MFD_ALLOW_SEALING.
   The noexec seal protects file execute bits; it does not forbid executable mmap.
 - Personality queries are allowed. Changes return EPERM in both programs,
@@ -60,9 +62,10 @@ behavior checks for changed rules, including error and kill outcomes.
 
 Never execute the real init shim as a test or replace the running system's init.
 The test driver intercepts its final exec and separately exercises its policy.
-Paxtest runs only after signature and pinned fingerprint verification. Its
-filesystem toggle remains unset. Treat blocked, failed, skipped and inconclusive
-tests as distinct outcomes. Record the environment and raw evidence for claims.
+Paxtest runs only after signature and pinned fingerprint verification. Both
+policy environment switches remain unset. Treat blocked, failed, skipped and
+inconclusive tests as distinct outcomes. Record the environment and raw evidence
+for claims.
 
 ## External test pin
 

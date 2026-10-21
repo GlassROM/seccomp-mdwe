@@ -43,6 +43,7 @@ hardening options. Compilation does not execute the programs.
 ./seccomp-error /bin/echo hello
 ./seccomp-strict /bin/echo hello
 SECCOMP_MDWE_FS=1 ./seccomp-error /bin/echo hello
+SECCOMP_MDWE_DENY_MEMFD=1 ./seccomp-error /bin/echo hello
 ```
 
 | Binary or setting | Behavior |
@@ -51,9 +52,13 @@ SECCOMP_MDWE_FS=1 ./seccomp-error /bin/echo hello
 | seccomp-strict | Restricted memory operations kill the process |
 | SECCOMP_MDWE_FS present | Also install optional filesystem rules |
 | SECCOMP_MDWE_FS absent | Install the memory policy without filesystem rules |
+| SECCOMP_MDWE_DENY_MEMFD present | Deny all memfd_create calls, including noexec memfds |
+| SECCOMP_MDWE_DENY_MEMFD absent | Allow memfds with MFD_NOEXEC_SEAL set and MFD_EXEC absent |
 
-The environment variable is presence-based: an empty value or 0 also enables
-the filesystem rules. The choice is fixed before the payload starts.
+Both environment switches are presence-based: an empty value or 0 enables
+the corresponding restriction. The choices are fixed before the payload starts.
+Full memfd denial returns EPERM in seccomp-error and kills in seccomp-strict.
+It is independent of the filesystem switch and does not revoke existing memfds.
 [The policy tables](docs/security-model.md) list the affected syscalls.
 With filesystem filtering enabled, openat2 returns ENOSYS in both modes so
 programs can attempt a compatibility fallback.
@@ -124,7 +129,7 @@ The runner requires a fresh work directory.
 [Recorded evidence](docs/validation/2026-10-21/README.md) includes raw output,
 commands and run conditions.
 
-Release and development each passed 199 focused policy checks. These include
+Release and development each passed 294 focused policy checks. These include
 MDWE failure handling and inheritance, personality forms, filesystem opt-in,
 error/kill behavior, foreign ABI rejection and intercepted init forwarding.
 Static analysis reported no findings. This is one environment and one legacy

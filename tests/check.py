@@ -33,14 +33,17 @@ for source in ("probe", "init-driver", "deny-mdwe", "mdwe-only"):
     subprocess.run(command, check=True)
 environment = dict(os.environ)
 environment.pop("SECCOMP_MDWE_FS", None)
+environment.pop("SECCOMP_MDWE_DENY_MEMFD", None)
 passed = 0
 
 
-def run(label, command, expected=0, filesystem=None, warning=False):
+def run(label, command, expected=0, filesystem=None, warning=False, deny_memfd=None):
     global passed
     env = dict(environment)
     if filesystem is not None:
         env["SECCOMP_MDWE_FS"] = filesystem
+    if deny_memfd is not None:
+        env["SECCOMP_MDWE_DENY_MEMFD"] = deny_memfd
     result = subprocess.run(list(map(str, command)), env=env, cwd=work,
                             text=True, capture_output=True, timeout=15)
     assert result.returncode == expected, (
@@ -75,6 +78,20 @@ with tempfile.TemporaryDirectory(prefix="seccomp-check-") as work:
             for filesystem in (None, "1"):
                 run(name + " noexec memfd " + flags + " filesystem=" + repr(filesystem),
                     [wrapper, probe, "memfd-noexec", flags], filesystem=filesystem)
+        for flags in ("0", "2", "8", "11", "16", "24", "0x100000008"):
+            for value in ("", "1", "0"):
+                for filesystem in (None, "1"):
+                    expected = 0 if name == "seccomp-error" else -signal.SIGSYS
+                    run(name + " deny memfd=" + repr(value) + " flags=" + flags
+                        + " filesystem=" + repr(filesystem),
+                        [wrapper, probe, "memfd-denied", flags], expected,
+                        filesystem=filesystem, deny_memfd=value)
+        run(name + " payload starts with both switches enabled",
+            [wrapper, probe, "query", "0xffffffff"], filesystem="1", deny_memfd="1")
+        expected = 0 if name == "seccomp-error" else -signal.SIGSYS
+        run(name + " memfd denial survives payload environment removal",
+            [wrapper, "/usr/bin/env", "-u", "SECCOMP_MDWE_DENY_MEMFD",
+             probe, "memfd-denied", "11"], expected, deny_memfd="1")
         for operation in filesystem_calls:
             run(name + " default filesystem " + operation,
                 [wrapper, probe, operation, "allowed"])
@@ -85,6 +102,10 @@ with tempfile.TemporaryDirectory(prefix="seccomp-check-") as work:
         run(name + " no payload", [wrapper], 1)
         run(name + " missing payload", [wrapper, "/definitely/absent"], 1)
         for error in (errno.EINVAL, errno.ENOSYS, errno.EPERM):
+            expected = 0 if name == "seccomp-error" else -signal.SIGSYS
+            run(name + " full memfd denial with MDWE failure " + str(error),
+                [tools / "deny-mdwe", error, wrapper, probe, "memfd-denied", "11"],
+                expected, warning=True, deny_memfd="1")
             for operation in ("query", "mmap-rx", "memfd-noexec"):
                 tail = ["0xffffffff"] if operation == "query" else []
                 expected = -signal.SIGSYS if name == "seccomp-strict" and operation == "mmap-rx" else 0
@@ -92,6 +113,8 @@ with tempfile.TemporaryDirectory(prefix="seccomp-check-") as work:
                     [tools / "deny-mdwe", error, wrapper, probe, operation, *tail],
                     expected, warning=True)
     init = tools / "init-driver"
+    run("init ignores payload memfd toggle", [init, probe, "memfd-noexec"],
+        deny_memfd="1")
     for value in ("0xffffffff", "0xffffffffffffffff", "0x12345678ffffffff"):
         run("init query " + value, [init, probe, "query", value])
     for value in ("0", "0x400000", "0x100000000", "0xffffffff00400000"):

@@ -101,6 +101,7 @@ python3 tools/paxtest.py --work-dir build/paxtest
 Use a fresh work directory. The runner authenticates the release before
 extraction, builds it with GCC so black-hat mode stays enabled, regenerates the
 launcher with the actual test list, and runs baseline, MDWE-only and
-seccomp-error sequentially. It clears SECCOMP_MDWE_FS and LD_PRELOAD for those
-runs. It records commands, environment, signature verification and binary hashes.
+seccomp-error sequentially. It clears SECCOMP_MDWE_FS, SECCOMP_MDWE_DENY_MEMFD
+and LD_PRELOAD for those runs. It records commands, environment, signature
+verification and binary hashes.
 A shell runner's zero exit status does not make every individual test conclusive.

@@ -24,7 +24,7 @@ not Linux's separate strict seccomp mode.
 | mprotect, pkey_mprotect | Deny calls containing PROT_EXEC, including redundant executable protections |
 | mmap | Deny writable/executable, anonymous/executable and shared/executable combinations |
 | shmat | Deny SHM_EXEC |
-| memfd_create | Require MFD_NOEXEC_SEAL and deny MFD_EXEC |
+| memfd_create | Deny all calls if SECCOMP_MDWE_DENY_MEMFD is present; otherwise require MFD_NOEXEC_SEAL and deny MFD_EXEC |
 | ptrace, process_vm_writev | Deny |
 | io_uring_setup, io_uring_enter, io_uring_register | Deny |
 | personality | Allow queries with lower 32 bits equal to 0xffffffff; deny changes with EPERM |
@@ -32,11 +32,19 @@ not Linux's separate strict seccomp mode.
 
 Private executable file mappings remain allowed for dynamic loading.
 memfd_create is permitted when MFD_NOEXEC_SEAL is set and MFD_EXEC is absent,
-including compatible CLOEXEC and sealing flags. The kernel clears the file's
-execute bits and sets F_SEAL_EXEC to prevent adding them later. This seal does
+including compatible CLOEXEC and sealing flags, unless SECCOMP_MDWE_DENY_MEMFD
+is present. That switch denies every memfd_create call with EPERM in
+seccomp-error or process-wide killing in seccomp-strict. Empty and 0 values
+enable it independently of filesystem filtering. The loaded restriction is
+inherited and cannot be removed by changing the payload's environment.
+
+The kernel clears a noexec memfd's execute bits and sets F_SEAL_EXEC to prevent
+adding them later. This seal does
 not prohibit executable mmap: private RX mappings of these files remain allowed
 by this policy. See the
 [kernel API description](https://docs.kernel.org/userspace-api/mfd_noexec.html).
+Full memfd denial prevents new memfd creation; it does not revoke inherited
+descriptors or mappings.
 The launcher rejects an inherited READ_IMPLIES_EXEC personality before loading
 the policy, since readable mappings could otherwise become executable without
 PROT_EXEC.
