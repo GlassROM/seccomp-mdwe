@@ -1,3 +1,8 @@
+/build/
 /seccomp-error
 /seccomp-init
 /seccomp-strict
+__pycache__/
+*.pyc
+/core
+/core.*

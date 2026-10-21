@@ -54,8 +54,10 @@ static void add_memory_filters(scmp_filter_ctx ctx) {
                       SCMP_A2(SCMP_CMP_MASKED_EQ, SHM_EXEC, SHM_EXEC)),
                 ctx, "protect executable shmat");
 
-  const int denied[] = {SCMP_SYS(memfd_create), SCMP_SYS(ptrace),
-                        SCMP_SYS(process_vm_writev), SCMP_SYS(io_uring_setup)};
+  const int denied[] = {
+      SCMP_SYS(memfd_create),      SCMP_SYS(ptrace),
+      SCMP_SYS(process_vm_writev), SCMP_SYS(io_uring_setup),
+      SCMP_SYS(io_uring_enter),    SCMP_SYS(io_uring_register)};
   for (size_t i = 0; i < sizeof(denied) / sizeof(denied[0]); ++i) {
     check_seccomp(rule0(ctx, GL_SC_ACTION, denied[i]), ctx,
                   "protect memory syscall");
