@@ -1,267 +1,130 @@
-#include <errno.h>
-#include <linux/fcntl.h>
-#include <seccomp.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include "sandbox-common.h"
+
+#include <fcntl.h>
+#include <stdbool.h>
 #include <sys/mman.h>
-#include <sys/prctl.h>
 #include <sys/shm.h>
 #include <sys/stat.h>
-#include <unistd.h>
 
 #ifdef GL_PERMISSIVE
 #define GL_SC_ACTION SCMP_ACT_ERRNO(EPERM)
 #else
-#define GL_SC_ACTION SCMP_ACT_KILL
+#define GL_SC_ACTION SCMP_ACT_KILL_PROCESS
 #endif
 
-static inline void setup_seccomp(void) {
-  scmp_filter_ctx ctx = seccomp_init(SCMP_ACT_ALLOW);
+static void enable_mdwe(void) {
+  /* Stable Linux UAPI values also allow building with pre-6.3 headers. */
+#ifndef PR_SET_MDWE
+#define PR_SET_MDWE 65
+#endif
+#ifndef PR_MDWE_REFUSE_EXEC_GAIN
+#define PR_MDWE_REFUSE_EXEC_GAIN (1UL << 0)
+#endif
+  if (prctl(PR_SET_MDWE, PR_MDWE_REFUSE_EXEC_GAIN, 0UL, 0UL, 0UL) < 0) {
+    const int error = errno;
+    fprintf(stderr,
+            "warning: PR_SET_MDWE unavailable: %s; continuing with "
+            "seccomp filters\n",
+            strerror(error));
+  }
+}
 
-  if (!ctx) {
-    perror("seccomp not supported");
-    exit(EXIT_FAILURE);
-  }
+static void add_memory_filters(scmp_filter_ctx ctx) {
+  check_seccomp(rule1(ctx, GL_SC_ACTION, SCMP_SYS(mprotect),
+                      SCMP_A2(SCMP_CMP_MASKED_EQ, PROT_EXEC, PROT_EXEC)),
+                ctx, "protect mprotect");
+  check_seccomp(rule1(ctx, GL_SC_ACTION, SCMP_SYS(pkey_mprotect),
+                      SCMP_A2(SCMP_CMP_MASKED_EQ, PROT_EXEC, PROT_EXEC)),
+                ctx, "protect pkey_mprotect");
+  check_seccomp(rule1(ctx, GL_SC_ACTION, SCMP_SYS(mmap),
+                      SCMP_A2(SCMP_CMP_MASKED_EQ, PROT_EXEC | PROT_WRITE,
+                              PROT_EXEC | PROT_WRITE)),
+                ctx, "protect writable executable mmap");
+  check_seccomp(
+      rule2(ctx, GL_SC_ACTION, SCMP_SYS(mmap),
+            SCMP_A2(SCMP_CMP_MASKED_EQ, PROT_EXEC, PROT_EXEC),
+            SCMP_A3(SCMP_CMP_MASKED_EQ, MAP_ANONYMOUS, MAP_ANONYMOUS)),
+      ctx, "protect anonymous executable mmap");
+  /* MAP_SHARED and MAP_SHARED_VALIDATE both have the MAP_SHARED bit set. */
+  check_seccomp(rule2(ctx, GL_SC_ACTION, SCMP_SYS(mmap),
+                      SCMP_A2(SCMP_CMP_MASKED_EQ, PROT_EXEC, PROT_EXEC),
+                      SCMP_A3(SCMP_CMP_MASKED_EQ, MAP_SHARED, MAP_SHARED)),
+                ctx, "protect shared executable mmap");
+  check_seccomp(rule1(ctx, GL_SC_ACTION, SCMP_SYS(shmat),
+                      SCMP_A2(SCMP_CMP_MASKED_EQ, SHM_EXEC, SHM_EXEC)),
+                ctx, "protect executable shmat");
 
-  if (seccomp_attr_set(ctx, SCMP_FLTATR_CTL_TSYNC, 1) < 0) {
-    perror("failed to set up seccomp in TSYNC mode, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
+  const int denied[] = {SCMP_SYS(memfd_create), SCMP_SYS(ptrace),
+                        SCMP_SYS(process_vm_writev), SCMP_SYS(io_uring_setup)};
+  for (size_t i = 0; i < sizeof(denied) / sizeof(denied[0]); ++i) {
+    check_seccomp(rule0(ctx, GL_SC_ACTION, denied[i]), ctx,
+                  "protect memory syscall");
   }
+}
 
-  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(mprotect), 1,
-                       SCMP_A2(SCMP_CMP_MASKED_EQ, PROT_EXEC, PROT_EXEC)) < 0) {
-    perror("mprotect could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
+static void add_filesystem_filters(scmp_filter_ctx ctx) {
+  const scmp_datum_t execute_bits[] = {S_IXUSR, S_IXGRP, S_IXOTH};
+  for (size_t i = 0; i < sizeof(execute_bits) / sizeof(execute_bits[0]); ++i) {
+    const scmp_datum_t bit = execute_bits[i];
+    const int chmod_calls[] = {SCMP_SYS(chmod), SCMP_SYS(fchmod)};
+    for (size_t j = 0; j < sizeof(chmod_calls) / sizeof(chmod_calls[0]); ++j) {
+      check_seccomp(rule1(ctx, GL_SC_ACTION, chmod_calls[j],
+                          SCMP_A1(SCMP_CMP_MASKED_EQ, bit, bit)),
+                    ctx, "protect chmod execute bits");
+    }
+    const int chmodat_calls[] = {SCMP_SYS(fchmodat), SCMP_SYS(fchmodat2)};
+    for (size_t j = 0; j < sizeof(chmodat_calls) / sizeof(chmodat_calls[0]);
+         ++j) {
+      check_seccomp(rule1(ctx, GL_SC_ACTION, chmodat_calls[j],
+                          SCMP_A2(SCMP_CMP_MASKED_EQ, bit, bit)),
+                    ctx, "protect fchmodat execute bits");
+    }
+    check_seccomp(rule1(ctx, GL_SC_ACTION, SCMP_SYS(creat),
+                        SCMP_A1(SCMP_CMP_MASKED_EQ, bit, bit)),
+                  ctx, "protect creat execute bits");
+    const scmp_datum_t creation_flags[] = {O_CREAT, O_TMPFILE};
+    for (size_t j = 0; j < sizeof(creation_flags) / sizeof(creation_flags[0]);
+         ++j) {
+      const scmp_datum_t flag = creation_flags[j];
+      check_seccomp(rule2(ctx, GL_SC_ACTION, SCMP_SYS(open),
+                          SCMP_A1(SCMP_CMP_MASKED_EQ, flag, flag),
+                          SCMP_A2(SCMP_CMP_MASKED_EQ, bit, bit)),
+                    ctx, "protect open execute bits");
+      check_seccomp(rule2(ctx, GL_SC_ACTION, SCMP_SYS(openat),
+                          SCMP_A2(SCMP_CMP_MASKED_EQ, flag, flag),
+                          SCMP_A3(SCMP_CMP_MASKED_EQ, bit, bit)),
+                    ctx, "protect openat execute bits");
+    }
   }
+  /* Classic seccomp cannot inspect openat2's pointed-to open_how structure. */
+  check_seccomp(rule0(ctx, GL_SC_ACTION, SCMP_SYS(openat2)), ctx,
+                "protect openat2");
+  check_seccomp(
+      rule1(ctx, GL_SC_ACTION, SCMP_SYS(execveat),
+            SCMP_A4(SCMP_CMP_MASKED_EQ, AT_EMPTY_PATH, AT_EMPTY_PATH)),
+      ctx, "protect execveat AT_EMPTY_PATH");
+}
 
-  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(mmap), 1,
-                       SCMP_A2(SCMP_CMP_MASKED_EQ, PROT_EXEC | PROT_WRITE,
-                               PROT_EXEC | PROT_WRITE)) < 0) {
-    perror("mmap could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
+static void setup_seccomp(bool filesystem) {
+  scmp_filter_ctx ctx = new_filter();
+  add_common_filters(ctx);
+  add_memory_filters(ctx);
+  if (filesystem) {
+    add_filesystem_filters(ctx);
   }
-
-  if (seccomp_rule_add(
-          ctx, GL_SC_ACTION, SCMP_SYS(mmap), 2,
-          SCMP_CMP(2, SCMP_CMP_MASKED_EQ, PROT_EXEC, PROT_EXEC),
-          SCMP_CMP(3, SCMP_CMP_MASKED_EQ, MAP_ANONYMOUS, MAP_ANONYMOUS)) < 0) {
-    perror("mmap anon could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-
-  if (seccomp_rule_add(
-          ctx, GL_SC_ACTION, SCMP_SYS(mmap), 2,
-          SCMP_CMP(2, SCMP_CMP_MASKED_EQ, PROT_EXEC, PROT_EXEC),
-          SCMP_CMP(3, SCMP_CMP_MASKED_EQ, MAP_SHARED, MAP_SHARED)) < 0) {
-    perror("mmap shared could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-
-  if (seccomp_rule_add(
-          ctx, GL_SC_ACTION, SCMP_SYS(mmap), 2,
-          SCMP_CMP(2, SCMP_CMP_MASKED_EQ, PROT_EXEC, PROT_EXEC),
-          SCMP_CMP(3, SCMP_CMP_MASKED_EQ, MAP_SHARED_VALIDATE, MAP_SHARED_VALIDATE)) < 0) {
-    perror("mmap shared could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-
-  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(pkey_mprotect), 1,
-                       SCMP_A2(SCMP_CMP_MASKED_EQ, PROT_EXEC, PROT_EXEC)) < 0) {
-    perror("pkey_mprotect could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-
-  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(shmat), 1,
-                       SCMP_A2(SCMP_CMP_MASKED_EQ, SHM_EXEC, SHM_EXEC)) < 0) {
-    perror("shmat could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-
-  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(memfd_create), 0) < 0) {
-    perror("memfd_create could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-
-  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(ptrace), 0) < 0) {
-    perror("ptrace could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-
-  /* Deny any direct memory-writes via process_vm_writev */
-  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(process_vm_writev), 0) < 0) {
-    perror("process_vm_writev could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-
-  /* Deny fexecve via execveat(..., AT_EMPTY_PATH) */
-  if (seccomp_rule_add(
-          ctx, GL_SC_ACTION, SCMP_SYS(execveat), 1,
-          /* flags argument is index 4 */
-          SCMP_CMP(4, SCMP_CMP_MASKED_EQ, AT_EMPTY_PATH, AT_EMPTY_PATH)) < 0) {
-    perror("execveat (AT_EMPTY_PATH) could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-
-  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(chmod), 1,
-                       SCMP_A1(SCMP_CMP_MASKED_EQ, S_IXUSR, S_IXUSR)) < 0) {
-    perror("chmod user-execute could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(chmod), 1,
-                       SCMP_A1(SCMP_CMP_MASKED_EQ, S_IXGRP, S_IXGRP)) < 0) {
-    perror("chmod group-execute could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(chmod), 1,
-                       SCMP_A1(SCMP_CMP_MASKED_EQ, S_IXOTH, S_IXOTH)) < 0) {
-    perror("chmod other-execute could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-
-  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(fchmod), 1,
-                       SCMP_A1(SCMP_CMP_MASKED_EQ, S_IXUSR, S_IXUSR)) < 0) {
-    perror("fchmod user-execute could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(fchmod), 1,
-                       SCMP_A1(SCMP_CMP_MASKED_EQ, S_IXGRP, S_IXGRP)) < 0) {
-    perror("fchmod group-execute could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(fchmod), 1,
-                       SCMP_A1(SCMP_CMP_MASKED_EQ, S_IXOTH, S_IXOTH)) < 0) {
-    perror("fchmod other-execute could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-
-  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(fchmodat), 1,
-                       SCMP_A2(SCMP_CMP_MASKED_EQ, S_IXUSR, S_IXUSR)) < 0) {
-    perror("fchmodat user-execute could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(fchmodat), 1,
-                       SCMP_A2(SCMP_CMP_MASKED_EQ, S_IXGRP, S_IXGRP)) < 0) {
-    perror("fchmodat group-execute could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(fchmodat), 1,
-                       SCMP_A2(SCMP_CMP_MASKED_EQ, S_IXOTH, S_IXOTH)) < 0) {
-    perror("fchmodat other-execute could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-
-  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(open), 2,
-                       SCMP_CMP(1, SCMP_CMP_MASKED_EQ, O_CREAT, O_CREAT),
-                       SCMP_A2(SCMP_CMP_MASKED_EQ, S_IXUSR, S_IXUSR)) < 0) {
-    perror("open (O_CREAT + S_IXUSR) could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(open), 2,
-                       SCMP_CMP(1, SCMP_CMP_MASKED_EQ, O_CREAT, O_CREAT),
-                       SCMP_A2(SCMP_CMP_MASKED_EQ, S_IXGRP, S_IXGRP)) < 0) {
-    perror("open (O_CREAT + S_IXGRP) could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(open), 2,
-                       SCMP_CMP(1, SCMP_CMP_MASKED_EQ, O_CREAT, O_CREAT),
-                       SCMP_A2(SCMP_CMP_MASKED_EQ, S_IXOTH, S_IXOTH)) < 0) {
-    perror("open (O_CREAT + S_IXOTH) could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-
-  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(openat), 2,
-                       SCMP_CMP(2, SCMP_CMP_MASKED_EQ, O_CREAT, O_CREAT),
-                       SCMP_A3(SCMP_CMP_MASKED_EQ, S_IXUSR, S_IXUSR)) < 0) {
-    perror(
-        "openat (O_CREAT + S_IXUSR) could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(openat), 2,
-                       SCMP_CMP(2, SCMP_CMP_MASKED_EQ, O_CREAT, O_CREAT),
-                       SCMP_A3(SCMP_CMP_MASKED_EQ, S_IXGRP, S_IXGRP)) < 0) {
-    perror(
-        "openat (O_CREAT + S_IXGRP) could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-  if (seccomp_rule_add(ctx, GL_SC_ACTION, SCMP_SYS(openat), 2,
-                       SCMP_CMP(2, SCMP_CMP_MASKED_EQ, O_CREAT, O_CREAT),
-                       SCMP_A3(SCMP_CMP_MASKED_EQ, S_IXOTH, S_IXOTH)) < 0) {
-    perror(
-        "openat (O_CREAT + S_IXOTH) could not be protected, failing safely!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-
-  if (seccomp_rule_add(
-          ctx, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(prctl), 2,
-          SCMP_CMP(0, SCMP_CMP_EQ, PR_SET_DUMPABLE, PR_SET_DUMPABLE),
-          SCMP_CMP(1, SCMP_CMP_MASKED_EQ, 1, 1)) < 0) {
-    perror("prctl(PR_SET_DUMPABLE,1) filter could not be added, triggering "
-           "kernel panic!");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-
-  if (seccomp_load(ctx) < 0) {
-    perror("failed to load seccomp filter");
-    seccomp_release(ctx);
-    exit(EXIT_FAILURE);
-  }
-
+  check_seccomp(seccomp_load(ctx), ctx, "load seccomp filter");
   seccomp_release(ctx);
 }
 
 int main(int argc, char *argv[]) {
-  if (argc < 1 || !argv[0]) __builtin_trap();
-  /* Prevent privilege escalation after exec. */
-  if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) < 0) {
-    perror("prctl(PR_SET_NO_NEW_PRIVS) failed, failing safely!");
-    exit(EXIT_FAILURE);
-  }
-
-  /* Prevent core dumps */
-  if (prctl(PR_SET_DUMPABLE, 0, 0, 0, 0) < 0) {
-    perror("prctl(PR_SET_DUMPABLE) failed, failing safely!");
-    exit(EXIT_FAILURE);
-  }
-
-  if (argc < 2) {
-    fprintf(stderr, "Usage: %s <program> [args...]\n", argv[0]);
+  if (argc < 2 || argv == NULL || argv[0] == NULL || argv[1] == NULL) {
+    fputs("Usage: seccomp-mdwe <program> [args...]\n", stderr);
     return EXIT_FAILURE;
   }
-  printf("Setting up seccomp filters...\n");
-  setup_seccomp();
-  printf("Seccomp filters set up successfully.\n");
-
+  prepare_process();
+  enable_mdwe();
+  setup_seccomp(getenv("SECCOMP_MDWE_FS") != NULL);
   execvp(argv[1], &argv[1]);
-
-  // Should not get here
-  perror("something went horribly wrong");
+  perror("execvp");
   return EXIT_FAILURE;
 }
