@@ -20,6 +20,8 @@ seccomp-init is an independent pre-init shim. Read [README.md](README.md),
 
 - Filesystem filtering depends on the presence of SECCOMP_MDWE_FS.
   Empty values and 0 still enable it.
+- With filesystem filtering enabled, openat2 returns ENOSYS in both payload
+  modes so callers can use their compatibility fallback.
 - Attempt PR_SET_MDWE with PR_MDWE_REFUSE_EXEC_GAIN in both payload modes.
   Failure warns and execution continues with seccomp. Preserve inheritance.
 - Personality queries are allowed. Changes return EPERM in both programs,

@@ -98,8 +98,9 @@ static void add_filesystem_filters(scmp_filter_ctx ctx) {
                     ctx, "protect openat execute bits");
     }
   }
-  /* Classic seccomp cannot inspect openat2's pointed-to open_how structure. */
-  check_seccomp(rule0(ctx, GL_SC_ACTION, SCMP_SYS(openat2)), ctx,
+  /* Classic seccomp cannot inspect open_how. Report an unavailable syscall so
+     callers can use their compatibility fallback in either policy mode. */
+  check_seccomp(rule0(ctx, SCMP_ACT_ERRNO(ENOSYS), SCMP_SYS(openat2)), ctx,
                 "protect openat2");
   check_seccomp(
       rule1(ctx, GL_SC_ACTION, SCMP_SYS(execveat),

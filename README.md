@@ -55,6 +55,8 @@ SECCOMP_MDWE_FS=1 ./seccomp-error /bin/echo hello
 The environment variable is presence-based: an empty value or 0 also enables
 the filesystem rules. The choice is fixed before the payload starts.
 [The policy tables](docs/security-model.md) list the affected syscalls.
+With filesystem filtering enabled, openat2 returns ENOSYS in both modes so
+programs can attempt a compatibility fallback.
 
 Both payload modes attempt PR_SET_MDWE with PR_MDWE_REFUSE_EXEC_GAIN.
 Protection is inherited across fork and exec. If the call is unsupported or

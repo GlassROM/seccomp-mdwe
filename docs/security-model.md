@@ -14,8 +14,9 @@ Filter construction, TSYNC and loading failures stop execution.
 
 seccomp-error returns EPERM for restricted operations.
 seccomp-strict uses process-wide killing for memory and enabled filesystem
-restrictions. Personality changes and attempts to re-enable dumpability always
-return EPERM in both binaries. The strict name describes the denial action,
+restrictions, except that openat2 returns ENOSYS in both binaries. Personality
+changes and attempts to re-enable dumpability always return EPERM in both
+binaries. The strict name describes the denial action,
 not Linux's separate strict seccomp mode.
 
 | Operation | Restriction |
@@ -43,7 +44,7 @@ filter. A payload cannot remove that filter by changing its environment.
 | --- | --- |
 | chmod, fchmod, fchmodat, fchmodat2 | Deny mode arguments containing any execute bit |
 | creat, open, openat | Deny creation with execute bits, including O_TMPFILE for open/openat |
-| openat2 | Deny all calls because classic seccomp cannot inspect struct open_how |
+| openat2 | Return ENOSYS in both modes because classic seccomp cannot inspect struct open_how |
 | execveat | Deny AT_EMPTY_PATH |
 
 These rules are not pathname confinement or a read-only filesystem. They do not

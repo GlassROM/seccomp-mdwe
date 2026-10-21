@@ -13,13 +13,16 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 
-static int denied(long result) {
-  if (result == -1 && errno == EPERM) {
+static int denied_errno(long result, int expected_errno) {
+  if (result == -1 && errno == expected_errno) {
     return EXIT_SUCCESS;
   }
-  fprintf(stderr, "expected EPERM, got %ld (errno %d)\n", result, errno);
+  fprintf(stderr, "expected errno %d, got %ld (errno %d)\n", expected_errno,
+          result, errno);
   return EXIT_FAILURE;
 }
+
+static int denied(long result) { return denied_errno(result, EPERM); }
 
 static int mapping(int protection, int flags) {
   void *address = mmap(NULL, 4096, protection, flags, -1, 0);
@@ -183,5 +186,6 @@ int main(int argc, char *argv[]) {
   if (argc == 3 && strcmp(argv[2], "allowed") == 0) {
     return result >= 0 || errno != EPERM ? EXIT_SUCCESS : EXIT_FAILURE;
   }
-  return denied(result);
+  return denied_errno(result,
+                      strcmp(operation, "openat2") == 0 ? ENOSYS : EPERM);
 }

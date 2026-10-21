@@ -73,7 +73,7 @@ with tempfile.TemporaryDirectory(prefix="seccomp-check-") as work:
         for operation in filesystem_calls:
             run(name + " default filesystem " + operation,
                 [wrapper, probe, operation, "allowed"])
-            expected = 0 if name == "seccomp-error" else -signal.SIGSYS
+            expected = 0 if name == "seccomp-error" or operation == "openat2" else -signal.SIGSYS
             for value in ("", "1", "0"):
                 run(name + " filesystem=" + repr(value) + " " + operation,
                     [wrapper, probe, operation], expected, filesystem=value)
